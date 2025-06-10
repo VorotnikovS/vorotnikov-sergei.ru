@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Portfolio of Sergei Vorotnikov</title>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+      background-color: black;
+    }
+
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+  </style>
+
+  <script>
+    // ✅ Функция должна быть объявлена до загрузки Rive
+    function startRive(isMobile) {
+      const canvas = document.getElementById("rive-canvas");
+      const riveFile = isMobile ? "ballar_mobile.riv" : "vorotnikov.riv";
+      const dpr = isMobile ? 1 : window.devicePixelRatio || 1;
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      canvas.style.width = "100vw";
+      canvas.style.height = "100vh";
+
+      let scrollYInput;
+      let goToWWInput;
+      let goToMathInput;
+      let ButtonBackInput;
+      let goAppStoreWWInput;
+      let GoGooglePlayMathInput;
+      let GoAppStoreMathInput;
+      let velocityY = 0;
+      let isTouching = false;
+
+      const riveInstance = new rive.Rive({
+        src: riveFile,
+        canvas: canvas,
+        autoplay: true,
+        artboard: "Vorotnikov",
+        stateMachines: ["State Machine 1"],
+        layout: new rive.Layout({
+          fit: rive.Fit.FitWidth,
+          alignment: rive.Alignment.TopCenter
+        }),
+        onLoad: () => {
+          const inputs = riveInstance.stateMachineInputs("State Machine 1");
+
+          const sizeInput = inputs.find(i => i.name === "Size");
+          if (sizeInput) sizeInput.value = window.innerWidth;
+
+          scrollYInput = inputs.find(i => i.name === "ScrollY");
+          goToWWInput = inputs.find(i => i.name === "GoToWW");
+          goToMathInput = inputs.find(i => i.name === "goToMath");
+          ButtonBackInput = inputs.find(i => i.name === "ButtonBack");
+          goAppStoreWWInput = inputs.find(i => i.name === "GoAppStoreWW");
+          GoGooglePlayMathInput = inputs.find(i => i.name === "GoGooglePlayMath");
+          GoAppStoreMathInput = inputs.find(i => i.name === "GoAppStoreMath");
+
+          monitorTriggerFlag();
+        },
+        onError: (err) => console.error("❌ Ошибка Rive:", err)
+      });
+
+      
+
+      if (isMobile) {
+        let lastY = null;
+
+        window.addEventListener("touchmove", (e) => {
+          if (!scrollYInput) return;
+          if (lastY === null) {
+            lastY = e.touches[0].clientY;
+            return;
+          }
+          const deltaY = lastY - e.touches[0].clientY;
+          velocityY = deltaY * 0.7;
+          velocityY = Math.max(-30, Math.min(30, velocityY));
+          scrollYInput.value += velocityY;
+          scrollYInput.value = Math.max(0, Math.min(4000, scrollYInput.value));
+          lastY = e.touches[0].clientY;
+          isTouching = true;
+        }, { passive: true });
+
+        window.addEventListener("touchend", () => {
+          lastY = null;
+          isTouching = false;
+        });
+      } else {
+        window.addEventListener("wheel", (e) => {
+          if (!scrollYInput) return;
+          scrollYInput.value += e.deltaY * 0.3;
+          scrollYInput.value = Math.max(0, Math.min(4000, scrollYInput.value));
+        });
+      }
+      
+
+      function monitorTriggerFlag() {
+        if (goToWWInput?.value) {
+          goToWWInput.value = false;
+          const scrollTarget = isMobile ? 1320 : 1285;
+          animateScrollYTo(scrollTarget);
+        }
+
+        if (goToMathInput?.value) {
+          goToMathInput.value = false;
+          const scrollTarget = isMobile ? 2572 : 2474;
+          animateScrollYTo(scrollTarget);
+                  }
+
+        if (ButtonBackInput?.value) {
+          ButtonBackInput.value = false;
+          animateScrollYTo(0);
+        }
+
+        if (goAppStoreWWInput?.value) {
+          goAppStoreWWInput.value = false;
+          const link = "https://apps.apple.com/ru/app/wake-the-world-my-map/id1529898421?l=en-GB";
+          if (isMobile) {
+            window.location.href = link;
+          } else {
+            window.open(link, "_blank");
+          }
+        }
+        
+        if (GoGooglePlayMathInput?.value) {
+          GoGooglePlayMathInput.value = false;
+          const link = "https://play.google.com/store/apps/details?id=com.example.mathgame"; // <-- укажи здесь свой реальный URL
+          if (isMobile) {
+            window.location.href = link;
+          } else {
+            window.open(link, "_blank");
+          }
+        }
+        
+        if (GoAppStoreMathInput?.value) {
+          GoAppStoreMathInput.value = false;
+          const link = "https://apps.apple.com/us/app/math-game-mental-mastery/id6745556295";
+          if (isMobile) {
+            window.location.href = link;
+          } else {
+            window.open(link, "_blank");
+          }
+        }
+
+        updateInertia();
+
+        requestAnimationFrame(monitorTriggerFlag);
+      }
+
+      function updateInertia() {
+        if (!scrollYInput || isTouching) return;
+
+        if (Math.abs(velocityY) > 0.1) {
+          scrollYInput.value += velocityY;
+          scrollYInput.value = Math.max(0, Math.min(4000, scrollYInput.value));
+          velocityY *= 0.95;
+        } else {
+          velocityY = 0;
+        }
+      }
+
+      function animateScrollYTo(targetValue) {
+        const duration = 600;
+        const startValue = scrollYInput.value;
+        const startTime = performance.now();
+
+        function step(currentTime) {
+          const elapsed = currentTime - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          const eased = easeInOutQuad(progress);
+          scrollYInput.value = startValue + (targetValue - startValue) * eased;
+          if (progress < 1) requestAnimationFrame(step);
+        }
+
+        requestAnimationFrame(step);
+      }
+
+      function easeInOutQuad(t) {
+        return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+      }
+    }
+
+    // 📦 Подключаем нужный Rive API в зависимости от устройства
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const script = document.createElement("script");
+    script.src = isMobile
+      ? "https://unpkg.com/@rive-app/canvas"
+      : "https://unpkg.com/@rive-app/webgl";
+    script.onload = () => startRive(isMobile);
+    document.head.appendChild(script);
+  </script>
+</head>
+
+<body>
+  <canvas id="rive-canvas"></canvas>
+</body>
+</html>
