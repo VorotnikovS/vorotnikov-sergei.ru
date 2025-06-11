@@ -19,11 +19,52 @@
       width: 100vw;
       height: 100vh;
     }
+
+    #loading-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-family: sans-serif;
+      font-size: 24px;
+      z-index: 10;
+    }
   </style>
 
   <script>
-    // ✅ Функция должна быть объявлена до загрузки Rive
-    function startRive(isMobile) {
+    async function loadRiveWithProgress(url) {
+      const response = await fetch(url);
+      const contentLength = response.headers.get("Content-Length");
+
+      if (!response.ok || !contentLength) {
+        throw new Error("❌ Не удалось загрузить файл или определить его размер.");
+      }
+
+      const total = parseInt(contentLength, 10);
+      const reader = response.body.getReader();
+      const chunks = [];
+      let received = 0;
+
+      const progressElement = document.getElementById("loading-progress");
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+
+        const percent = Math.floor((received / total) * 100);
+        progressElement.textContent = `${percent}%`;
+      }
+
+      document.getElementById("loading-container").style.display = "none";
+
+      const blob = new Blob(chunks);
+      return await blob.arrayBuffer();
+    }
+
+    async function startRive(isMobile) {
       const canvas = document.getElementById("rive-canvas");
       const riveFile = isMobile ? "ballar_mobile.riv" : "vorotnikov.riv";
       const dpr = isMobile ? 1 : window.devicePixelRatio || 1;
@@ -43,7 +84,7 @@
       let isTouching = false;
 
       const riveInstance = new rive.Rive({
-        src: riveFile,
+        buffer: await loadRiveWithProgress(riveFile),
         canvas: canvas,
         autoplay: true,
         artboard: "Vorotnikov",
@@ -70,8 +111,6 @@
         },
         onError: (err) => console.error("❌ Ошибка Rive:", err)
       });
-
-      
 
       if (isMobile) {
         let lastY = null;
@@ -102,7 +141,6 @@
           scrollYInput.value = Math.max(0, Math.min(4000, scrollYInput.value));
         });
       }
-      
 
       function monitorTriggerFlag() {
         if (goToWWInput?.value) {
@@ -115,7 +153,7 @@
           goToMathInput.value = false;
           const scrollTarget = isMobile ? 2572 : 2474;
           animateScrollYTo(scrollTarget);
-                  }
+        }
 
         if (ButtonBackInput?.value) {
           ButtonBackInput.value = false;
@@ -131,17 +169,17 @@
             window.open(link, "_blank");
           }
         }
-        
+
         if (GoGooglePlayMathInput?.value) {
           GoGooglePlayMathInput.value = false;
-          const link = "https://play.google.com/store/apps/details?id=com.example.mathgame"; // <-- укажи здесь свой реальный URL
+          const link = "https://play.google.com/store/apps/details?id=com.example.mathgame";
           if (isMobile) {
             window.location.href = link;
           } else {
             window.open(link, "_blank");
           }
         }
-        
+
         if (GoAppStoreMathInput?.value) {
           GoAppStoreMathInput.value = false;
           const link = "https://apps.apple.com/us/app/math-game-mental-mastery/id6745556295";
@@ -153,7 +191,6 @@
         }
 
         updateInertia();
-
         requestAnimationFrame(monitorTriggerFlag);
       }
 
@@ -190,7 +227,6 @@
       }
     }
 
-    // 📦 Подключаем нужный Rive API в зависимости от устройства
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const script = document.createElement("script");
     script.src = isMobile
@@ -203,5 +239,6 @@
 
 <body>
   <canvas id="rive-canvas"></canvas>
+  <div id="loading-container">Загрузка: <span id="loading-progress">0%</span></div>
 </body>
 </html>
