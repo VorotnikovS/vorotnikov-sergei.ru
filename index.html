@@ -51,6 +51,7 @@
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+
         chunks.push(value);
         received += value.length;
 
@@ -67,11 +68,6 @@
     async function startRive(isMobile) {
       const canvas = document.getElementById("rive-canvas");
       const riveFile = isMobile ? "chub.riv" : "vorotnikov_monkey.riv";
-      const dpr = isMobile ? 1 : window.devicePixelRatio || 1;
-      canvas.width = window.innerWidth * dpr;
-      canvas.height = window.innerHeight * dpr;
-      canvas.style.width = "100vw";
-      canvas.style.height = "100vh";
 
       let scrollYInput;
       let goToWWInput;
@@ -80,36 +76,81 @@
       let goAppStoreWWInput;
       let GoGooglePlayMathInput;
       let GoAppStoreMathInput;
+
       let velocityY = 0;
       let isTouching = false;
+
+      function resizeCanvas(riveInstance) {
+        const dpr = isMobile ? 1 : window.devicePixelRatio || 1;
+
+        canvas.width = window.innerWidth * dpr;
+        canvas.height = window.innerHeight * dpr;
+        canvas.style.width = "100vw";
+        canvas.style.height = "100vh";
+
+        if (riveInstance) {
+          riveInstance.resizeDrawingSurfaceToCanvas();
+        }
+      }
+
+      resizeCanvas();
 
       const riveInstance = new rive.Rive({
         buffer: await loadRiveWithProgress(riveFile),
         canvas: canvas,
         autoplay: true,
         artboard: "Site",
-        stateMachines: ["State Machine 1"],
+        stateMachines: "State Machine 1",
+
+        // Главное изменение:
+        // Rive сам привяжет дефолтный ViewModel Instance к artboard/state machine.
+        autoBind: true,
+
         layout: new rive.Layout({
           fit: rive.Fit.FitWidth,
           alignment: rive.Alignment.TopCenter
         }),
+
         onLoad: () => {
-          const inputs = riveInstance.stateMachineInputs("State Machine 1");
+          resizeCanvas(riveInstance);
 
-          const sizeInput = inputs.find(i => i.name === "Size");
-          if (sizeInput) sizeInput.value = window.innerWidth;
+          const vmi = riveInstance.viewModelInstance;
 
-          scrollYInput = inputs.find(i => i.name === "ScrollY");
-          goToWWInput = inputs.find(i => i.name === "GoToWW");
-          goToMathInput = inputs.find(i => i.name === "goToMath");
-          ButtonBackInput = inputs.find(i => i.name === "ButtonBack");
-          goAppStoreWWInput = inputs.find(i => i.name === "GoAppStoreWW");
-          GoGooglePlayMathInput = inputs.find(i => i.name === "GoGooglePlayMath");
-          GoAppStoreMathInput = inputs.find(i => i.name === "GoAppStoreMath");
+          if (!vmi) {
+            console.error("❌ ViewModelInstance не найден. Проверь, что в Rive Editor назначен Default ViewModel и Default Instance.");
+            return;
+          }
+
+          const sizeInput = vmi.number("Size");
+          if (sizeInput) {
+            sizeInput.value = window.innerWidth;
+          }
+
+          scrollYInput = vmi.number("ScrollY");
+
+          goToWWInput = vmi.boolean("GoToWW");
+          goToMathInput = vmi.boolean("goToMath");
+          ButtonBackInput = vmi.boolean("ButtonBack");
+
+          goAppStoreWWInput = vmi.boolean("GoAppStoreWW");
+          GoGooglePlayMathInput = vmi.boolean("GoGooglePlayMath");
+          GoAppStoreMathInput = vmi.boolean("GoAppStoreMath");
 
           monitorTriggerFlag();
         },
+
         onError: (err) => console.error("❌ Ошибка Rive:", err)
+      });
+
+      window.addEventListener("resize", () => {
+        resizeCanvas(riveInstance);
+
+        const vmi = riveInstance.viewModelInstance;
+        const sizeInput = vmi?.number("Size");
+
+        if (sizeInput) {
+          sizeInput.value = window.innerWidth;
+        }
       });
 
       if (isMobile) {
@@ -117,15 +158,20 @@
 
         window.addEventListener("touchmove", (e) => {
           if (!scrollYInput) return;
+
           if (lastY === null) {
             lastY = e.touches[0].clientY;
             return;
           }
+
           const deltaY = lastY - e.touches[0].clientY;
+
           velocityY = deltaY * 0.7;
           velocityY = Math.max(-30, Math.min(30, velocityY));
+
           scrollYInput.value += velocityY;
           scrollYInput.value = Math.max(0, Math.min(4000, scrollYInput.value));
+
           lastY = e.touches[0].clientY;
           isTouching = true;
         }, { passive: true });
@@ -137,6 +183,7 @@
       } else {
         window.addEventListener("wheel", (e) => {
           if (!scrollYInput) return;
+
           scrollYInput.value += e.deltaY * 0.3;
           scrollYInput.value = Math.max(0, Math.min(4000, scrollYInput.value));
         });
@@ -162,7 +209,9 @@
 
         if (goAppStoreWWInput?.value) {
           goAppStoreWWInput.value = false;
+
           const link = "https://apps.apple.com/ru/app/wake-the-world-my-map/id1529898421?l=en-GB";
+
           if (isMobile) {
             window.location.href = link;
           } else {
@@ -172,7 +221,9 @@
 
         if (GoGooglePlayMathInput?.value) {
           GoGooglePlayMathInput.value = false;
+
           const link = "https://play.google.com/store/apps/details?id=com.example.mathgame";
+
           if (isMobile) {
             window.location.href = link;
           } else {
@@ -182,7 +233,9 @@
 
         if (GoAppStoreMathInput?.value) {
           GoAppStoreMathInput.value = false;
+
           const link = "https://apps.apple.com/us/app/math-game-mental-mastery/id6745556295";
+
           if (isMobile) {
             window.location.href = link;
           } else {
@@ -207,6 +260,8 @@
       }
 
       function animateScrollYTo(targetValue) {
+        if (!scrollYInput) return;
+
         const duration = 600;
         const startValue = scrollYInput.value;
         const startTime = performance.now();
@@ -215,24 +270,35 @@
           const elapsed = currentTime - startTime;
           const progress = Math.min(elapsed / duration, 1);
           const eased = easeInOutQuad(progress);
+
           scrollYInput.value = startValue + (targetValue - startValue) * eased;
-          if (progress < 1) requestAnimationFrame(step);
+
+          if (progress < 1) {
+            requestAnimationFrame(step);
+          }
         }
 
         requestAnimationFrame(step);
       }
 
       function easeInOutQuad(t) {
-        return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+        return t < 0.5
+          ? 2 * t * t
+          : -1 + (4 - 2 * t) * t;
       }
     }
 
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
     const script = document.createElement("script");
-    script.src = isMobile
-      ? "https://unpkg.com/@rive-app/canvas"
-      : "https://unpkg.com/@rive-app/webgl";
+
+    // Для ViewModel/Data Binding нужен webgl2.
+    // Да, Rive опять поменял входную дверь в дом.
+    script.src = "https://unpkg.com/@rive-app/webgl2@2";
+
     script.onload = () => startRive(isMobile);
+    script.onerror = () => console.error("❌ Не удалось загрузить Rive runtime.");
+
     document.head.appendChild(script);
   </script>
 </head>
