@@ -67,7 +67,7 @@
 
     async function startRive(isMobile) {
       const canvas = document.getElementById("rive-canvas");
-      const riveFile = isMobile ? "chub.riv" : "vorotnikov_monkey.riv";
+      const riveFile = isMobile ? "" : "main.riv";
 
       let scrollYInput;
       let goToWWInput;
@@ -99,7 +99,7 @@
         buffer: await loadRiveWithProgress(riveFile),
         canvas: canvas,
         autoplay: true,
-        artboard: "Site",
+        artboard: "Main",
         stateMachines: "State Machine 1",
 
         // Главное изменение:
